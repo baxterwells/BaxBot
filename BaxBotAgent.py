@@ -107,15 +107,21 @@ class BaxBot:
         {context}
 
         RULES:
-        - To use a tool, you MUST respond with the exact syntax: CALL_TOOL: tool_name | arg1 | arg2
-        - Example: CALL_TOOL: memory_manager | info | bio | I love dark mode
-        - Example: CALL_TOOL: dnd_character_sheet | update_hp | -5
-        - Available tools: family_photo_sorter, system_stats, memory_manager, dnd_character_sheet
         - Use the following context to inform whether to call a tool:
-            - If the user asks about sorting photos or pictures, call 'family_photo_sorter'.
-            - If the user asks about system performance or stats, call 'system_stats'.
-            - If the user asks about memory management or vault updates, call 'memory_manager'.
+            - If the user asks about sorting photos or pictures, call 'family_photo_sorter' with no arguments.
+            - If the user asks about system performance or stats, call 'system_stats' with no arguments.
+            - If the user asks about storing a new memory, call 'memory_manager' with the following arguments: category, key, content.
+                - If the user asks you to refresh or update your memory, call 'memory_manager' with no arguments.
         - Otherwise, respond to the user naturally using the provided context and your unique tone.
+
+        TOOLS:
+        - To use a tool, you MUST respond with the exact syntax: CALL_TOOL: tool_name | arg1 | arg2
+            - Available tools: family_photo_sorter, system_stats, memory_manager
+
+        EXAMPLES:
+        - CALL_TOOL: family_photo_sorter
+        - CALL_TOOL: system_stats
+        - CALL_TOOL: memory_manager | info | bio | I love dark mode
 
         ABOUT THE TOOLS:
         1. family_photo_sorter: Scans a folder of images, detects objects, and sorts them into subfolders based on detected objects.

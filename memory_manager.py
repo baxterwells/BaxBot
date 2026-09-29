@@ -48,7 +48,7 @@ class PersonalAgentMemory:
             metadatas=[{"type": category}],
             ids=[doc_id]
         )
-        #print(f"[MemoryManager] Saved: {doc_id} (Category: {category})")
+        print(f"[MemoryManager] Saved: {doc_id} (Category: {category})")
 
     def add_document(self, text: str, category: str, doc_id: str):
         """Low-level: Uses UPSERT for manual file/document ingestion."""
@@ -57,7 +57,7 @@ class PersonalAgentMemory:
             metadatas=[{"type": category}],
             ids=[doc_id]
         )
-        print(f"[MemoryManager] Processed: {doc_id} (Type: {category})")
+        print(f"[MemoryManager] Embedded Document: {doc_id} (Type: {category})")
 
     def update_entry(self, category: str, key: str, text: str):
         """Agent-friendly surgical update for specific facts."""
@@ -102,6 +102,7 @@ class PersonalAgentMemory:
         # to prevent BaxBot from crashing when trying to join None/Empty.
         if results and results['documents'] and len(results['documents']) > 0:
             return results['documents'][0]
+        print(f"\t[MemoryManager] Returned 0 documents.")
         return []
 
     def list_all_memories(self):
@@ -121,7 +122,7 @@ class PersonalAgentMemory:
         """Deletes a specific memory entry by its ID."""
         doc_id = f"{category}_{key}"
         self.collection.delete(ids=[doc_id])
-        print(f"[System]: Deleted {doc_id}")
+        print(f"\t[MemoryManager] Deleted: {doc_id}")
 
 
 

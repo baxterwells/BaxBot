@@ -28,6 +28,7 @@ class MemoryManagerTool(BaseTool):
         self.manager = PersonalAgentMemory()
 
     def execute(self, args: list = None) -> str:
+        #print("ARGS: ", args)
         if not args:
             return self.manager.ingest_vault("memory_vault")
 
