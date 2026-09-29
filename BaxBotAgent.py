@@ -86,10 +86,11 @@ class BaxBot:
         # 1. Retrieval Phase
         info = self.memory.query_memory(user_input, "info")
         tone = self.memory.query_memory(user_input, "tone")
-        context = "\n".join(info + tone)
+        faith = self.memory.query_memory(user_input, "faith")
+        # context = "\n".join(info + tone)
 
         # --- DEBUG LINE ---
-        # print(f"\n[DEBUG] Retrieved Context: {context}\n") 
+        print(f"\n[DEBUG] Retrieved Context: {info}\n...\n{faith}\n...\n{tone}\n...\n") 
         # ------------------
 
         # 2. Construct Short-Term Memory String (STM)
@@ -103,8 +104,15 @@ class BaxBot:
         system_prompt = f"""
         You are BaxBot, a personal AI assistant.
         
-        PERSONAL CONTEXT:
-        {context}
+        PERSONAL INFO: {info}
+        - This is information retrieved from your long-term memory. Use it to inform your responses.
+
+        FAITH: {faith}
+        - This is information about the user's faith, including written notes, references to the Bible, and other faith-based content.
+        - If applicable and (the user is asking a faith-based question or is talking about their faith), use it to inform your responses. Otherwise, ignore it.
+
+        TONE: {tone}
+        - This tone (tone of voice) you should mimic and respond to the user in. The tone may change over time, so check the latest tone in memory.
 
         RULES:
         - Use the following context to inform whether to call a tool:
@@ -122,6 +130,7 @@ class BaxBot:
         - CALL_TOOL: family_photo_sorter
         - CALL_TOOL: system_stats
         - CALL_TOOL: memory_manager | info | bio | I love dark mode
+        - CALL_TOOL: memory_manager
 
         ABOUT THE TOOLS:
         1. family_photo_sorter: Scans a folder of images, detects objects, and sorts them into subfolders based on detected objects.
