@@ -1,7 +1,7 @@
 import os
 import ollama
 from memory_manager import PersonalAgentMemory 
-from tools_library import FamilyPhotoSorter, SystemStatsTool, MemoryManagerTool, DnDCharacterSheetTool
+from tools_library import FamilyPhotoSorter, SystemStatsTool, MemoryManagerTool
 from rich.console import Console
 from rich.markdown import Markdown  # <--- NEW: Import the Markdown parser
 
@@ -15,7 +15,7 @@ class BaxBot:
     def __init__(self, model_name: str, memory: PersonalAgentMemory):
         self.console = Console()
         self.console.print("")
-        self._print_markdown_vanilla("### Initializing BaxBot...")
+        self._print_markdown_vanilla("# Initializing BaxBot")
         self.console.print(f"\n{baxbotTag} Connecting to [bold cyan]{model_name}[/bold cyan] (for reasoning) and [bold cyan]{summary_model}[/bold cyan] (for summarization)...")
         
         self.model_name = model_name
@@ -29,7 +29,6 @@ class BaxBot:
             "family_photo_sorter": FamilyPhotoSorter(),
             "system_stats": SystemStatsTool(),
             "memory_manager": MemoryManagerTool(),
-            "dnd_character_sheet": DnDCharacterSheetTool(),
         }
         self.console.print("")
         self._print_markdown_vanilla("# BaxBot ready")
@@ -113,18 +112,15 @@ class BaxBot:
         - Example: CALL_TOOL: dnd_character_sheet | update_hp | -5
         - Available tools: family_photo_sorter, system_stats, memory_manager, dnd_character_sheet
         - Use the following context to inform whether to call a tool:
-            - If the user asks about sorting family photos, call 'family_photo_sorter'.
+            - If the user asks about sorting photos or pictures, call 'family_photo_sorter'.
             - If the user asks about system performance or stats, call 'system_stats'.
             - If the user asks about memory management or vault updates, call 'memory_manager'.
-            - If the user asks about, talks about, or references their DnD character, call 'dnd_character_sheet'.
-                - When calling 'dnd_character_sheet', and the user asks for information about their character, use the 'get_sheet' command as the argument.
         - Otherwise, respond to the user naturally using the provided context and your unique tone.
 
         ABOUT THE TOOLS:
         1. family_photo_sorter: Scans a folder of images, detects objects, and sorts them into subfolders based on detected objects.
         2. system_stats: Returns current system statistics (CPU, memory, etc.) for the machine BaxBot is running on.
         3. memory_manager: Manages the personal memory vault. Can ingest new information or update existing entries.
-        4. dnd_character_sheet: Manages the current active DnD character. Can retrieve the full sheet, update attributes, adjust HP, or add weapons.
         """
 
         full_prompt = f"{system_prompt}{stm_context}\n\nUser: {user_input}\nAssistant:"

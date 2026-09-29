@@ -2,5 +2,5 @@ Found Photos/
 memory_vault/
 agent_memory/
 admin_tool.py
-BaxBotvenv/
+.venv/
 __pycache__/
