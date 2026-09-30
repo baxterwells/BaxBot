@@ -90,7 +90,7 @@ class BaxBot:
         # context = "\n".join(info + tone)
 
         # --- DEBUG LINE ---
-        print(f"\n[DEBUG] Retrieved Context:\n{info}\n...\n{faith}\n...\n{tone}\n...\n") 
+        # print(f"\n[DEBUG] Retrieved Context:\n{info}\n...\n{faith}\n...\n{tone}\n...\n") 
         # ------------------
 
         # 2. Construct Short-Term Memory String (STM)

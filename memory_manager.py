@@ -70,25 +70,40 @@ class PersonalAgentMemory:
         print(f"[MemoryManager] Updated: {doc_id} (Type: {category})")
 
     def ingest_vault(self, vault_path: str):
-        """Scans a directory and syncs it with the database."""
+        """Scans a directory and all subdirectories recursively to sync with the database."""
         root = pathlib.Path(vault_path)
         if not root.exists():
             return f"Error: Vault path '{vault_path}' not found."
 
-        print(f"--- Starting Vault Sync: {root.absolute()} ---")
-        for category_dir in root.iterdir():
-            if category_dir.is_dir():
-                category_name = category_dir.name
-                for file_path in category_dir.glob("*.txt"):
-                    try:
-                        with open(file_path, 'r', encoding='utf-8') as f:
-                            content = f.read().strip()
-                            if content:
-                                doc_id = f"{category_name}_{file_path.stem}"
-                                self.add_document(content, category_name, doc_id)
-                    except Exception as e:
-                        print(f"Error reading {file_path.name}: {e}")
-        return "Vault sync complete."
+        print(f"--- Starting Recursive Vault Sync: {root.absolute()} ---")
+
+        # .rglob("*.txt") finds every .txt file in every subfolder automatically
+        for file_path in root.rglob("*.txt"):
+            try:
+                # 1. Get the path relative to the root (e.g., 'faith/holy_spirit_zoom/note1.txt')
+                relative_path = file_path.relative_to(root)
+                
+                # 2. Create the doc_id
+                # We take the relative path, remove the suffix (.txt), 
+                # then turn the path parts into a single string joined by underscores.
+                # This is much safer and avoids the 'str has no attribute stem' error.
+                path_no_ext = relative_path.with_suffix('')
+                doc_id = "_".join(path_no_ext.parts)
+
+                # s 3. Determine the category (the first folder in the relative path)
+                category_name = relative_path.parts[0]
+
+                # 4. Read and ingest the file
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read().strip()
+                    if content:
+                        self.add_document(content, category_name, doc_id)
+                        # print(f"[Ingested] {doc_id}") # Uncomment for verbose logging
+
+            except Exception as e:
+                print(f"Error processing {file_path}: {e}")
+
+        return "Recursive Vault sync complete."
 
     def query_memory(self, query_text: str, category: str, n_results: int = 2) -> List[str]:
         """Queries the memory filtered by category. Returns a list of strings."""
