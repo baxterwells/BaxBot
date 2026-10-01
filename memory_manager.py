@@ -53,7 +53,8 @@ class PersonalAgentMemory:
             metadatas=[{"type": category}],
             ids=[doc_id]
         )
-        self.console.print(f"{memoryManagerTag} Saved: {doc_id} (Category: {category})")
+        # self.console.print(f"{memoryManagerTag} Saved: {doc_id} (Category: {category})")
+        self.console.print(f"{memoryManagerTag} Saved: {doc_id}")
 
     def add_document(self, text: str, category: str, doc_id: str):
         """Low-level: Uses UPSERT for manual file/document ingestion."""
@@ -62,7 +63,7 @@ class PersonalAgentMemory:
             metadatas=[{"type": category}],
             ids=[doc_id]
         )
-        self.console.print(f"{memoryManagerTag} Embedded Document: {doc_id} (Type: {category})")
+        self.console.print(f"{memoryManagerTag} Embedded Document: {doc_id} (Category: {category})")
 
     def update_entry(self, category: str, key: str, text: str):
         """Agent-friendly surgical update for specific facts."""
@@ -72,7 +73,7 @@ class PersonalAgentMemory:
             metadatas=[{"type": category}],
             ids=[doc_id]
         )
-        self.console.print(f"{memoryManagerTag} Updated: {doc_id} (Type: {category})")
+        self.console.print(f"{memoryManagerTag} Updated: {doc_id} (Category: {category})")
 
     def ingest_vault(self, vault_path: str):
         """Scans a directory and all subdirectories recursively to sync with the database."""
@@ -122,7 +123,7 @@ class PersonalAgentMemory:
         # to prevent BaxBot from crashing when trying to join None/Empty.
         if results and results['documents'] and len(results['documents']) > 0:
             return results['documents'][0]
-        self.console.print(f"\t{memoryManagerTag} Take a look at this error. Returned 0 documents.")
+        self.console.print(f"\t{memoryManagerTag} Take a look (cmd+f) at this error, Bax. Returned 0 documents.")
         return []
 
     def list_all_memories(self):

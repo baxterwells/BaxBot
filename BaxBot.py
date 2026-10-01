@@ -199,7 +199,7 @@ if __name__ == "__main__":
         try:
             # multiline=True allows Enter to create new lines
             # The standard way to submit in this mode is Alt+Enter
-            query = session.prompt("\nAsk BaxBot (Press Opt+Enter to submit): ", multiline=True)
+            query = session.prompt("\nAsk BaxBot (Press 'Esc, Return' to submit or 'bye'): ", multiline=True)
         except EOFError:
             break
 
