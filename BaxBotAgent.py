@@ -85,9 +85,8 @@ class BaxBot:
     def chat(self, user_input: str):
         # 1. Retrieval Phase
         info = self.memory.query_memory(user_input, "info")
-        tone = self.memory.query_memory(user_input, "tone")
         faith = self.memory.query_memory(user_input, "faith")
-        # context = "\n".join(info + tone)
+        tone = self.memory.query_memory(user_input, "tone")
 
         # --- DEBUG LINE ---
         # print(f"\n[DEBUG] Retrieved Context:\n{info}\n...\n{faith}\n...\n{tone}\n...\n") 
@@ -125,14 +124,14 @@ class BaxBot:
         ABOUT THE TOOLS:
         1. family_photo_sorter: Scans a folder of images, detects objects, and sorts them into subfolders based on detected objects.
         2. system_stats: Returns current system statistics (CPU, memory, etc.) for the machine BaxBot is running on.
-        3. memory_manager: Manages the personal memory vault. Can ingest new information or update existing entrie
+        3. memory_manager: Manages the personal memory vault. Can ingest new information or update existing entries.
 
         RULES FOR TOOLS:
         - Use the following context to inform whether to call a tool:
             - If the user asks about sorting photos or pictures, call 'family_photo_sorter' with no arguments.
             - If the user asks about system performance or stats, call 'system_stats' with no arguments.
             - If the user asks about storing a new memory, call 'memory_manager' with the following arguments: category, key, content.
-                - If the user asks you to refresh or update your memory, call 'memory_manager' with no arguments.
+                - If the user asks you to refresh or update your memory or to ingest memories, call 'memory_manager' with no arguments.
         - Otherwise, respond to the user naturally using the provided context and your unique tone.
 
         EXAMPLES OF TOOL CALLS:
