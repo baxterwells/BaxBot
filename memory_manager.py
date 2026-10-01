@@ -1,10 +1,14 @@
 import chromadb
 import ollama
 import pathlib
+from rich.console import Console
 from chromadb import Documents, EmbeddingFunction, Embeddings
 from typing import Any, List, Optional
 
+memoryManagerTag = "[bold white][ MemoryManager]:[/bold white]"
+
 class OllamaEmbeddingFunction(EmbeddingFunction):
+    console = Console()
     """A custom embedding function that follows the ChromaDB protocol."""
     def __init__(self, model_name: str):
         self.model_name = model_name
@@ -25,6 +29,7 @@ class OllamaEmbeddingFunction(EmbeddingFunction):
         return OllamaEmbeddingFunction(model_name=config["model_name"])
 
 class PersonalAgentMemory:
+    console = Console()
     def __init__(self, db_path: str = "./agent_memory", model_name: str = "nomic-embed-text"):
         self.db_path = db_path
         self.model_name = model_name
@@ -48,7 +53,7 @@ class PersonalAgentMemory:
             metadatas=[{"type": category}],
             ids=[doc_id]
         )
-        print(f"[MemoryManager] Saved: {doc_id} (Category: {category})")
+        self.console.print(f"{memoryManagerTag} Saved: {doc_id} (Category: {category})")
 
     def add_document(self, text: str, category: str, doc_id: str):
         """Low-level: Uses UPSERT for manual file/document ingestion."""
@@ -57,7 +62,7 @@ class PersonalAgentMemory:
             metadatas=[{"type": category}],
             ids=[doc_id]
         )
-        print(f"[MemoryManager] Embedded Document: {doc_id} (Type: {category})")
+        self.console.print(f"{memoryManagerTag} Embedded Document: {doc_id} (Type: {category})")
 
     def update_entry(self, category: str, key: str, text: str):
         """Agent-friendly surgical update for specific facts."""
@@ -67,7 +72,7 @@ class PersonalAgentMemory:
             metadatas=[{"type": category}],
             ids=[doc_id]
         )
-        print(f"[MemoryManager] Updated: {doc_id} (Type: {category})")
+        self.console.print(f"{memoryManagerTag} Updated: {doc_id} (Type: {category})")
 
     def ingest_vault(self, vault_path: str):
         """Scans a directory and all subdirectories recursively to sync with the database."""
@@ -75,7 +80,7 @@ class PersonalAgentMemory:
         if not root.exists():
             return f"Error: Vault path '{vault_path}' not found."
 
-        print(f"--- Starting Recursive Vault Sync: {root.absolute()} ---")
+        self.console.print(f"--- Starting Recursive Vault Sync: {root.absolute()} ---")
 
         # .rglob("*.txt") finds every .txt file in every subfolder automatically
         for file_path in root.rglob("*.txt"):
@@ -101,7 +106,7 @@ class PersonalAgentMemory:
                         # print(f"[Ingested] {doc_id}") # Uncomment for verbose logging
 
             except Exception as e:
-                print(f"Error processing {file_path}: {e}")
+                self.console.print(f"Error processing {file_path}: {e}")
 
         return "Recursive Vault sync complete."
 
@@ -117,12 +122,12 @@ class PersonalAgentMemory:
         # to prevent BaxBot from crashing when trying to join None/Empty.
         if results and results['documents'] and len(results['documents']) > 0:
             return results['documents'][0]
-        print(f"\t[MemoryManager] Returned 0 documents.")
+        self.console.print(f"\t{memoryManagerTag} Take a look at this error. Returned 0 documents.")
         return []
 
     def list_all_memories(self):
         """Prints every single piece of memory currently in the database."""
-        print("\n--- BEGIN MEMORY INSPECTION ---")
+        self.console.print("\n--- BEGIN MEMORY INSPECTION ---")
         # .get() retrieves the actual human-readable text and metadata
         results = self.collection.get()
         
@@ -130,14 +135,14 @@ class PersonalAgentMemory:
             doc_id = results['ids'][i]
             content = results['documents'][i]
             metadata = results['metadatas'][i]
-            print(f"ID: {doc_id} | Type: {metadata['type']} | Content: {content[:100]}...") # Print first 100 chars
-        print("--- END MEMORY INSPECTION ---\n")
+            self.console.print(f"ID: {doc_id} | Type: {metadata['type']} | Content: {content[:100]}...") # Print first 100 chars
+        self.console.print("--- END MEMORY INSPECTION ---\n")
 
     def delete_memory(self, category: str, key: str):
         """Deletes a specific memory entry by its ID."""
         doc_id = f"{category}_{key}"
         self.collection.delete(ids=[doc_id])
-        print(f"\t[MemoryManager] Deleted: {doc_id}")
+        self.console.print(f"\t{memoryManagerTag} Deleted: {doc_id}")
 
 
 
@@ -149,7 +154,7 @@ if __name__ == "__main__":
     # Test the new add_memory method
     memory.add_memory("info", "session_1", "User likes dark mode and Python.")
     # Test Query
-    print("Test Query Result:", memory.query_memory("What does the user like?", "info"))
+    memory.console.print("Test Query Result:", memory.query_memory("What does the user like?", "info"))
     
     # Force ingest
     memory.ingest_vault("./memory_vault")

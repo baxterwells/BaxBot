@@ -1,9 +1,11 @@
 import subprocess
+from rich.console import Console
 import json # Added for cleaner output handling
 from abc import ABC, abstractmethod
 from memory_manager import PersonalAgentMemory
 
 class BaseTool(ABC):
+    console = Console()
     """The abstract blueprint for every tool BaxBot can use."""
     @abstractmethod
     def execute(self, args: list = None) -> str:
@@ -11,14 +13,14 @@ class BaseTool(ABC):
 
 class FamilyPhotoSorter(BaseTool):
     def execute(self, args: list = None) -> str:
-        print("[FamilyPhotoSorter]: Running Family Photo Sorter...")
+        self.console.print("[ FamilyPhotoSorter]: Running Family Photo Sorter...")
         result = subprocess.run(["python3", "family_photo_sorter.py"], capture_output=True, text=True)
         return result.stdout if result.stdout else "Process complete (no output)."
 
 class SystemStatsTool(BaseTool):
     """A new tool to show off your M4 Max capabilities."""
     def execute(self, args: list = None) -> str:
-        print("[SystemStatsTool]: Gathering system statistics...")
+        self.console.print("[󰣖 SystemStatsTool]: Gathering system statistics...")
         cmd = "top -l 1 | head -n 10" 
         result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
         return result.stdout

@@ -1,9 +1,13 @@
 import os
+import sys
 import ollama
 from memory_manager import PersonalAgentMemory 
 from tools_library import FamilyPhotoSorter, SystemStatsTool, MemoryManagerTool
 from rich.console import Console
 from rich.markdown import Markdown  # <--- NEW: Import the Markdown parser
+from prompt_toolkit import PromptSession # <--- NEW import for multi-line input
+from prompt_toolkit.key_binding import KeyBindings # <--- NEW
+
 
 main_model = "gemma4:26b-mlx"  # Ollama model for reasoning and tool orchestration
 # main_model = "gemma2:27b"  # Ollama model for reasoning and tool orchestration
@@ -73,7 +77,7 @@ class BaxBot:
         self.memory.add_memory("info", f"Chat history {timestamp}", summary)
         
         self.session_history = []
-        self.console.print(f"\n[bold green]{baxbotTag} Successfully saved the conversation![/bold green]")
+        self.console.print(f"[bold green]{baxbotTag} Successfully saved the conversation![/bold green]")
 
     def run_tool(self, tool_name: str, args: list = None):
         """Looks up the tool in the registry and executes it with provided args."""
@@ -184,18 +188,28 @@ class BaxBot:
 
 if __name__ == "__main__":
     main_console = Console()
-    
     MY_MODEL_NAME = main_model
     user_memory = PersonalAgentMemory()
     bot = BaxBot(MY_MODEL_NAME, user_memory)
 
+    # Initialize the session
+    session = PromptSession()
+
     while True:
-        query = input("\nAsk BaxBot (or 'bye'): ")
-        
+        try:
+            # multiline=True allows Enter to create new lines
+            # The standard way to submit in this mode is Alt+Enter
+            query = session.prompt("\nAsk BaxBot (Press Opt+Enter to submit): ", multiline=True)
+        except EOFError:
+            break
+
+        if not query.strip():
+            continue
+
         if query.lower() in ['exit', 'quit', 'bye', 'see ya']:
             if bot.session_history:
                 bot._archive_memory()
-
             main_console.print(f"\n{baxbotTag} Bye for now!\n")
             break
+
         bot.chat(query)
