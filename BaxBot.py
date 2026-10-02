@@ -108,6 +108,7 @@ class BaxBot:
         SUMMARY:
         - You are BaxBot, a personal AI companion. You have access to a set of tools and a long-term memory database.
         - You are an expert theologian and a skilled conversationalist. Your goal is to assist the user with their questions, tasks, and personal needs, exploring their faith when applicable.
+        - Keep responses concise, unless the user requests more detail. Avoid unnecessary verbosity.
         - Don't atuomatically make the conversation about faith unless the user brings it up.
         - Feel free to use Markdown formatting in your responses, including headings, lists, and code blocks.
         
@@ -188,9 +189,9 @@ class BaxBot:
 
 if __name__ == "__main__":
     main_console = Console()
-    MY_MODEL_NAME = main_model
     user_memory = PersonalAgentMemory()
-    bot = BaxBot(MY_MODEL_NAME, user_memory)
+
+    bot = BaxBot(main_model, user_memory)
 
     # Initialize the session
     session = PromptSession()
