@@ -27,7 +27,7 @@ def get_user_inputs():
     root.attributes("-topmost", True)
 
     source_folder = None
-    output_name = "Found Photos"
+    output_name = "Sorted Photos"
     target_subjects_input = "" # Initialize empty
 
     try:

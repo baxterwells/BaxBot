@@ -2,7 +2,7 @@ import os
 import sys
 import ollama
 from memory_manager import PersonalAgentMemory 
-from tools_library import FamilyPhotoSorter, SystemStatsTool, MemoryManagerTool
+from tools_library import PhotoSorter, SystemStatsTool, MemoryManagerTool
 from rich.console import Console
 from rich.markdown import Markdown  # <--- NEW: Import the Markdown parser
 from prompt_toolkit import PromptSession # <--- NEW import for multi-line input
@@ -30,7 +30,7 @@ class BaxBot:
 
         self.console.print(f"{baxbotTag} Registering [bold magenta]tools[/bold magenta]...")
         self.tool_registry = {
-            "family_photo_sorter": FamilyPhotoSorter(),
+            "photo_sorter": PhotoSorter(),
             "system_stats": SystemStatsTool(),
             "memory_manager": MemoryManagerTool(),
         }
@@ -124,23 +124,23 @@ class BaxBot:
 
         TOOLS:
         - To use a tool, you MUST respond with the exact syntax: CALL_TOOL: tool_name | arg1 | arg2
-            - Available tools: family_photo_sorter, system_stats, memory_manager
+            - Available tools: photo_sorter, system_stats, memory_manager
 
         ABOUT THE TOOLS:
-        1. family_photo_sorter: Scans a folder of images, detects objects, and sorts them into subfolders based on detected objects.
+        1. photo_sorter: Scans a folder of images, detects objects, and sorts them into subfolders based on detected objects.
         2. system_stats: Returns current system statistics (CPU, memory, etc.) for the machine BaxBot is running on.
         3. memory_manager: Manages the personal memory vault. Can ingest new information or update existing entries.
 
         RULES FOR TOOLS:
         - Use the following context to inform whether to call a tool:
-            - If the user asks about sorting photos or pictures, call 'family_photo_sorter' with no arguments.
+            - If the user asks about sorting photos or pictures, call 'photo_sorter' with no arguments.
             - If the user asks about system performance or stats, call 'system_stats' with no arguments.
             - If the user asks about storing a new memory, call 'memory_manager' with the following arguments: category, key, content.
                 - If the user asks you to refresh or update your memory or to ingest memories, call 'memory_manager' with no arguments.
         - Otherwise, respond to the user naturally using the provided context and your unique tone.
 
         EXAMPLES OF TOOL CALLS:
-        - CALL_TOOL: family_photo_sorter
+        - CALL_TOOL: photo_sorter
         - CALL_TOOL: system_stats
         - CALL_TOOL: memory_manager | info | bio | I love dark mode
         - CALL_TOOL: memory_manager
