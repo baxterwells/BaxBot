@@ -3,7 +3,7 @@
 ## Installs
 Required pip installations:
 ```
-pip install ollama chromadb rich
+pip install ollama chromadb rich prompt_toolkit
 ```
 Required Ollama installations:
 ```
