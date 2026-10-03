@@ -2,5 +2,5 @@
     "main_model": "gemma4:26b-mlx",
     "summary_model": "mistral",
     "history_threshold": 10,
-    "baxbot_tag": "[bold white][󱚤 BaxBot]:[/bold white]"
+    "baxbot_tag": "[bold white][󱚤 BaxBot][/bold white]"
 }
