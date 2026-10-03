@@ -26,8 +26,9 @@ class BaxBot:
         self.summary_model = self.config["summary_model"]
         self.history_threshold = self.config["history_threshold"]
         self.baxbotTag = self.config["baxbot_tag"]
-        
-        self.console.print(f"[bold cyan]--- Initializing BaxBot ---[/bold cyan]")
+
+        self.console.print(f"")
+        self.console.print(f"[bold blue]--- Initializing BaxBot ---[/bold blue]")
         self.console.print(f"\n{self.baxbotTag} Connecting to [bold cyan]{self.main_model}[/bold cyan] (for reasoning) and [bold cyan]{self.summary_model}[/bold cyan] (for summarization)...")
 
         self.session_history = []
@@ -49,10 +50,6 @@ class BaxBot:
     def _load_text(self, path):
         with open(path, 'r') as f:
             return f.read()
-
-    def _print_markdown_vanilla(self, text: str):
-            md = Markdown(text)
-            self.console.print(md)
 
     def _print_markdown(self, text: str):
         self.console.print(f"\n{self.baxbotTag}")
@@ -176,8 +173,8 @@ if __name__ == "__main__":
 
     while True:
         try:
-            main_console.print(f"[italic](Press 'Esc+Return' to submit or 'bye' to exit)[/italic]")
-            query = session.prompt("\nAsk BaxBot: ", multiline=True)
+            main_console.print(f"\n[italic](Press 'Esc + Return' to submit and 'bye' to exit)[/italic]")
+            query = session.prompt("Ask BaxBot: ", multiline=True)
         except EOFError:
             break
 
