@@ -132,6 +132,7 @@ class PersonalAgentMemory:
                 # Get the content and the category from the metadata
                 content = results['documents'][0][i]
                 category = results['metadatas'][0][i]['type'] # Access the 'type' key in metadata
+                # self.console.print(f"\n{memoryManagerTag} Retrieved: {content[:100]}... (Category: {category})") # Print first 100 chars
                 
                 # Add the structured object to our list
                 enriched_results.append({
@@ -160,6 +161,15 @@ class PersonalAgentMemory:
         doc_id = f"{category}_{key}"
         self.collection.delete(ids=[doc_id])
         self.console.print(f"\t{memoryManagerTag} Deleted: {doc_id}")
+
+    def _clear_all_memory(self):
+        """
+        The Nuclear Option: Deletes every single record in the current collection.
+        Warning: This cannot be undone.
+        """
+        self.collection.delete()
+        self.console.print(f"\n{memoryManagerTag} [bold red]!!! ALL MEMORY HAS BEEN PURGED !!![/bold red]")
+
 
 
 
