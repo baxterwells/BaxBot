@@ -86,23 +86,36 @@ class BaxOrchestrator:
         self.ui.print_status("Successfully saved!")
 
     def chat(self, user_input: str):
-        # 1. Retrieval
-        info = self.memory.query_memory(user_input, "info")
-        faith = self.memory.query_memory(user_input, "faith")
-        tone = self.memory.query_memory(user_input, "tone")
+        # 1. SINGLE Unified Retrieval Phase
+        # We get a list of dicts: [{'content': '...', 'category': 'info'}, ...]
+        retrieved_items = self.memory.query_all_memory(user_input)
 
-        # 2. Context Construction
+        # 2. Local Categorization (Sorting the 'Enriched' items into their buckets)
+        info = []
+        faith = []
+        tone = []
+
+        for item in retrieved_items:
+            if item['category'] == "info":
+                info.append(item['content'])
+            elif item['category'] == "faith":
+                faith.append(item['content'])
+            elif item['category'] == "tone":
+                tone.append(item['content'])
+
+        # 3. Context Construction (The rest of your code remains exactly the same)
         stm_context = ""
         if self.session_history:
             stm_context = "\n--- Recent Conversation ---\n" + "\n".join(
                 [f"{m['role']}: {m['content']}" for m in self.session_history]
             )
 
-        # 3. Prompt Assembly
+        # 4. Prompt Assembly (Pass the lists we just built)
         system_prompt = self._get_system_prompt(info, faith, tone, stm_context)
         full_prompt = f"{system_prompt}\n\nUser: {user_input}\nAssistant:"
 
         self.ui.print_status("Thinking...")
+
         
         # 4. LLM Call
         response_data = ollama.generate(model=self.config["main_model"], prompt=full_prompt)

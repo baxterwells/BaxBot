@@ -54,7 +54,7 @@ class PersonalAgentMemory:
             ids=[doc_id]
         )
         # self.console.print(f"{memoryManagerTag} Saved: {doc_id} (Category: {category})")
-        self.console.print(f"{memoryManagerTag} Saved: {doc_id}")
+        self.console.print(f"\n{memoryManagerTag} Saved: {doc_id}")
 
     def add_document(self, text: str, category: str, doc_id: str):
         """Low-level: Uses UPSERT for manual file/document ingestion."""
@@ -63,7 +63,7 @@ class PersonalAgentMemory:
             metadatas=[{"type": category}],
             ids=[doc_id]
         )
-        self.console.print(f"{memoryManagerTag} Embedded Document: {doc_id} (Category: {category})")
+        self.console.print(f"\n{memoryManagerTag} Embedded Document: {doc_id} (Category: {category})")
 
     def update_entry(self, category: str, key: str, text: str):
         """Agent-friendly surgical update for specific facts."""
@@ -73,7 +73,7 @@ class PersonalAgentMemory:
             metadatas=[{"type": category}],
             ids=[doc_id]
         )
-        self.console.print(f"{memoryManagerTag} Updated: {doc_id} (Category: {category})")
+        self.console.print(f"\n{memoryManagerTag} Updated: {doc_id} (Category: {category})")
 
     def ingest_vault(self, vault_path: str):
         """Scans a directory and all subdirectories recursively to sync with the database."""
@@ -111,20 +111,36 @@ class PersonalAgentMemory:
 
         return "Recursive Vault sync complete."
 
-    def query_memory(self, query_text: str, category: str, n_results: int = 2) -> List[str]:
-        """Queries the memory filtered by category. Returns a list of strings."""
+    def query_all_memory(self, query_text: str, n_results: int = 5) -> List[dict]:
+        """
+        Performs a single semantic search across ALL categories.
+        Returns a list of dictionaries containing the content and the category.
+        """
+        # 1. Perform the query WITHOUT the 'where' filter
         results = self.collection.query(
             query_texts=[query_text],
-            n_results=n_results,
-            where={"type": category}
+            n_results=n_results
         )
         
-        # NEW: Defensive check. If Chroma returns nothing, return an empty list 
-        # to prevent BaxBot from crashing when trying to join None/Empty.
-        if results and results['documents'] and len(results['documents']) > 0:
-            return results['documents'][0]
-        self.console.print(f"\t{memoryManagerTag} Take a look (cmd+f) at this error, Bax. Returned 0 documents.")
-        return []
+        # 2. Prepare a list to hold our enriched result objects
+        enriched_results = []
+
+        # 3. much-needed defensive check
+        if results and results['documents'] and len(results['documents'][0]) > 0:
+            # Loop through all the items found in the results
+            for i in range(len(results['documents'][0])):
+                # Get the content and the category from the metadata
+                content = results['documents'][0][i]
+                category = results['metadatas'][0][i]['type'] # Access the 'type' key in metadata
+                
+                # Add the structured object to our list
+                enriched_results.append({
+                    "content": content,
+                    "category": category
+                })
+        
+        return enriched_results
+
 
     def list_all_memories(self):
         """Prints every single piece of memory currently in the database."""
@@ -155,7 +171,7 @@ if __name__ == "__main__":
     # Test the new add_memory method
     memory.add_memory("info", "session_1", "User likes dark mode and Python.")
     # Test Query
-    memory.console.print("Test Query Result:", memory.query_memory("What does the user like?", "info"))
+    memory.console.print("Test Query Result:", memory.query_all_memory("What does the user like?"))
     
     # Force ingest
     memory.ingest_vault("./memory_vault")
