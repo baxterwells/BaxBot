@@ -10,67 +10,70 @@ from rich.markdown import Markdown
 from prompt_toolkit import PromptSession 
 from prompt_toolkit.key_binding import KeyBindings 
 
-main_model = "gemma4:26b-mlx"  
-summary_model = "mistral"  
-
-baxbotTag = "[bold white][󱚤 BaxBot]:[/bold white]"
-
 class BaxBot:
-    def __init__(self, model_name: str, memory: PersonalAgentMemory):
-        self.console = Console()
-        self.console.print("")
-        self._print_markdown_vanilla("# Initializing BaxBot")
-        self.console.print(f"\n{baxbotTag} Connecting to [bold cyan]{model_name}[/bold cyan] (for reasoning) and [bold cyan]{summary_model}[/bold cyan] (for summarization)...")
+    def __init__(self, memory: PersonalAgentMemory):        
+        # 1. Load Configuration
+        self.config = self._load_config("agent_assets/config.json")
         
-        self.model_name = model_name
+        # 2. Load Prompt Template
+        self.system_prompt_template = self._load_text("agent_assets/system_prompt.txt")
+
+        self.summary_prompt_template = self._load_text("agent_assets/summary_system_prompt.txt")
+
+        self.console = Console()
         self.memory = memory
+        self.main_model = self.config["main_model"]
+        self.summary_model = self.config["summary_model"]
+        self.history_threshold = self.config["history_threshold"]
+        self.baxbotTag = self.config["baxbot_tag"]
+        
+        self.console.print(f"[bold cyan]--- Initializing BaxBot ---[/bold cyan]")
+        self.console.print(f"\n{self.baxbotTag} Connecting to [bold cyan]{self.main_model}[/bold cyan] (for reasoning) and [bold cyan]{self.summary_model}[/bold cyan] (for summarization)...")
 
-        self.session_history = [] 
-        self.history_threshold = 10 
+        self.session_history = []
 
-        self.console.print(f"{baxbotTag} Registering [bold magenta]tools[/bold magenta]...")
+        self.console.print(f"{self.baxbotTag} Registering [bold magenta]tools[/bold magenta]...")
         self.tool_registry = {
             "photo_sorter": PhotoSorter(),
             "system_stats": SystemStatsTool(),
             "memory_manager": MemoryManagerTool(),
         }
         self.console.print("")
-        self._print_markdown_vanilla("# BaxBot ready")
-        self.console.print(f"\n{baxbotTag} Hi! I'm BaxBot. What's on your mind?")
+        self.console.print(f"[bold green]--- BaxBot Ready ---[/bold green]")
+        self.console.print(f"\n{self.baxbotTag} Hi! I'm BaxBot. What's on your mind?")
+
+    def _load_config(self, path):
+        with open(path, 'r') as f:
+            return json.load(f)
+
+    def _load_text(self, path):
+        with open(path, 'r') as f:
+            return f.read()
 
     def _print_markdown_vanilla(self, text: str):
             md = Markdown(text)
             self.console.print(md)
 
     def _print_markdown(self, text: str):
-        self.console.print(f"\n{baxbotTag}")
+        self.console.print(f"\n{self.baxbotTag}")
         md = Markdown(text)
         self.console.print(md)
 
     def _archive_memory(self):
-        self.console.print(f"\n{baxbotTag} Let me save this conversation to [bold]Long-Term Memory[/bold]...")
+        self.console.print(f"\n{self.baxbotTag} Let me save this conversation to [bold]Long-Term Memory[/bold]...")
 
         history_text = "\n".join([f"{m['role']}: {m['content']}" for m in self.session_history])
         
-        summary_prompt = f"""
-        You are a memory clerk. Summarize the following conversation into a concise, 
-        fact-dense paragraph that captures important personal details, preferences, 
-        and ongoing tasks. This will be used for future retrieval.
+        summary_prompt = self.summary_prompt_template.replace("{{HISTORY_TEXT}}", history_text)
         
-        CONVERSATION:
-        {history_text}
-        
-        SUMMARY:
-        """
-        
-        summary_data = ollama.generate(model=summary_model, prompt=summary_prompt)
+        summary_data = ollama.generate(model=self.summary_model, prompt=summary_prompt)
         summary = summary_data['response'].strip()
 
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
         self.memory.add_memory("info", f"Chat history {timestamp}", summary)
         
         self.session_history = []
-        self.console.print(f"[bold green]{baxbotTag} Successfully saved the conversation![/bold green]")
+        self.console.print(f"[bold green]{self.baxbotTag} Successfully saved the conversation![/bold green]")
 
     def run_tool(self, tool_name: str, args: dict = None):
         """Looks up the tool in the registry and executes it with provided args dictionary."""
@@ -82,9 +85,14 @@ class BaxBot:
 
     def chat(self, user_input: str):
         # 1. Retrieval Phase
-        info = self.memory.query_memory(user_input, "info")
-        faith = self.memory.query_memory(user_input, "faith")
-        tone = self.memory.query_memory(user_input, "tone")
+        info_raw = self.memory.query_memory(user_input, "info")
+        faith_raw = self.memory.query_memory(user_input, "faith")
+        tone_raw = self.memory.query_memory(user_input, "tone")
+
+        # We join list items with a newline so they appear as distinct points in the prompt
+        info = "\n".join(info_raw) if isinstance(info_raw, list) else info_raw
+        faith = "\n".join(faith_raw) if isinstance(faith_raw, list) else faith_raw
+        tone = "\n".join(tone_raw) if isinstance(tone_raw, list) else tone_raw
 
         # 2. Construct Short-Term Memory String (STM)
         stm_context = ""
@@ -93,42 +101,20 @@ class BaxBot:
                 [f"{m['role']}: {m['content']}" for m in self.session_history]
             )
 
-        # 3. Reasoning Phase
-        # UPDATED SYSTEM PROMPT FOR JSON TOOL CALLING
-        system_prompt = f"""
-        SUMMARY:
-        - You are BaxBot, a personal AI companion. You have access to a set of tools and a long-term memory database.
-        - You are an expert theologian and a skilled conversationalist. Your goal is to assist the user with their questions, tasks, and personal needs, exploring their faith when applicable.
-        - Keep responses concise, unless the user requests more detail. Avoid unnecessary verbosity.
-        - Don't automatically make the conversation about faith unless the user brings it up.
-        - Feel free to use Markdown formatting in your responses, including headings, lists, and code blocks.
+        # 3. Reasoning Phase (Inject variables into template)
+        # We use .replace() so we don't break the JSON curly braces in the text
+        system_prompt = (
+            self.system_prompt_template
+            .replace("{{INFO}}", info)
+            .replace("{{FAITH}}", faith)
+            .replace("{{TONE}}", tone)
+            .replace("{{STM_CONTEXT}}", stm_context)
+        )
+
+        full_prompt = f"{system_prompt}\n\nUser: {user_input}\nAssistant:"
+        self.console.print(f"\n{self.baxbotTag} [italic]Thinking...[/italic]")
         
-        PERSONAL INFO: {info}
-        FAITH: {faith}
-        TONE: {tone}
-
-        TOOLS:
-        - To use a tool, you MUST respond with a JSON block wrapped in [TOOL_CALL] tags.
-        - Format: [TOOL_CALL] {{"tool": "tool_name", "args": {{"arg_name": "value"}}}} [/TOOL_CALL]
-
-        AVAILABLE TOOLS:
-        1. photo_sorter: Scans/sorts images. 
-           - Usage: [TOOL_CALL] {{"tool": "photo_sorter", "args": {{}}}} [/TOOL_CALL]
-        2. system_stats: Returns CPU/Memory stats.
-           - Usage: [TOOL_CALL] {{"tool": "system_stats", "args": {{}}}} [/TOOL_CALL]
-        3. memory_manager: Manages the personal memory vault.
-           - Usage: [TOOL_CALL] {{"tool": "memory_manager", "args": {{"category": "info", "key": "bio", "content": "text"}}}} [/TOOL_CALL]
-           - Usage (refresh): [TOOL_CALL] {{"tool": "memory_manager", "args": {{}}}} [/TOOL_CALL]
-
-        EXAMPLES:
-        - User: "Sort my pictures" -> [TOOL_CALL] {{"tool": "photo_sorter", "args": {{}}}} [/TOOL_CALL]
-        - User: "Remember that I love dark mode" -> [TOOL_CALL] {{"tool": "memory_manager", "args": {{"category": "info", "key": "preference", "content": "I love dark mode"}}}} [/TOOL_CALL]
-        """
-
-        full_prompt = f"{system_prompt}{stm_context}\n\nUser: {user_input}\nAssistant:"
-        self.console.print(f"\n{baxbotTag} [italic]Thinking...[/italic]")
-        
-        response_data = ollama.generate(model=self.model_name, prompt=full_prompt)
+        response_data = ollama.generate(model=self.main_model, prompt=full_prompt)
         response = response_data['response'].strip()
 
         # 4. Action Phase (JSON Parsing)
@@ -143,6 +129,8 @@ class BaxBot:
                 
                 json_str = response[start_idx:end_idx].strip()
                 tool_data = json.loads(json_str)
+
+                # self.console.print(f"tool_data: {tool_data}")  # Debugging line to inspect parsed JSON
                 
                 tool_name = tool_data["tool"]
                 tool_args = tool_data.get("args", {}) # Default to empty dict if no args provided
@@ -150,11 +138,11 @@ class BaxBot:
                 tool_result = self.run_tool(tool_name, tool_args)
                 self.console.print(f"[bold magenta][{tool_name}]:[/bold magenta] {tool_result}")
 
-                self.console.print(f"\n{baxbotTag}[italic]Thinking...[/italic]\n")
+                self.console.print(f"\n{self.baxbotTag}[italic]Thinking...[/italic]\n")
 
                 # 5. Synthesis Phase
                 synthesis_prompt = f"{full_prompt}\nTool Output: {tool_result}\nAssistant:"
-                synthesis_data = ollama.generate(model=self.model_name, prompt=synthesis_prompt)
+                synthesis_data = ollama.generate(model=self.summary_model, prompt=synthesis_prompt)
                 final_response = synthesis_data['response'].strip()
                 
                 self._print_markdown(final_response)
@@ -180,15 +168,16 @@ class BaxBot:
 
 if __name__ == "__main__":
     main_console = Console()
-    user_memory = PersonalAgent_Memory() # Assuming this is correct based on your import
+    user_memory = PersonalAgentMemory()
 
-    bot = BaxBot(main_model, user_memory)
+    bot = BaxBot(user_memory)
 
     session = PromptSession()
 
     while True:
         try:
-            query = session.prompt("\nAsk BaxBot (Press 'Esc+Return' to submit or 'bye'): ", multiline=True)
+            main_console.print(f"[italic](Press 'Esc+Return' to submit or 'bye' to exit)[/italic]")
+            query = session.prompt("\nAsk BaxBot: ", multiline=True)
         except EOFError:
             break
 
@@ -198,7 +187,7 @@ if __name__ == "__main__":
         if query.lower() in ['exit', 'quit', 'bye', 'see ya']:
             if bot.session_history:
                 bot._archive_memory()
-            main_console.print(f"\n{baxbotTag} Bye for now!\n")
+            main_console.print(f"\n{bot.baxbotTag} Bye for now!\n")
             break
 
         bot.chat(query)

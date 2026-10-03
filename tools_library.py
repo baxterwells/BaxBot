@@ -13,14 +13,14 @@ class BaseTool(ABC):
 
 class PhotoSorter(BaseTool):
     def execute(self, args: list = None) -> str:
-        self.console.print("[ PhotoSorter]: Running Photo Sorter...")
+        self.console.print("[bold][ PhotoSorter][/bold]: Running Photo Sorter...")
         result = subprocess.run(["python3", "photo_sorter.py"], capture_output=True, text=True)
         return result.stdout if result.stdout else "Process complete (no output)."
 
 class SystemStatsTool(BaseTool):
     """A new tool to show off your M4 Max capabilities."""
     def execute(self, args: list = None) -> str:
-        self.console.print("[󰣖 SystemStats]: Gathering system statistics...")
+        self.console.print("[bold][󰣖 SystemStats][/bold]: Gathering system statistics...")
         cmd = "top -l 1 | head -n 10" 
         result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
         return result.stdout

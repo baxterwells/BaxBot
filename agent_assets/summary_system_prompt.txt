@@ -1,0 +1,8 @@
+You are a memory clerk. Summarize the following conversation into a concise, 
+fact-dense paragraph that captures important personal details, preferences, 
+and ongoing tasks. This will be used for future retrieval.
+
+CONVERSATION:
+{{HISTORY_TEXT}}
+
+SUMMARY:
