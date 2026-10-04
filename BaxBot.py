@@ -175,13 +175,13 @@ class BaxOrchestrator:
             self.ui.print_tool_output(name, result)
 
             # 6. SYNTHESIS
-            # synthesis_prompt = f"{full_prompt}\nTool Output: {result}\nAssistant:"
-            # s_data = ollama.generate(model=self.config["summary_model"], prompt=synthesis_prompt)
-            # final_resp = s_data['response'].strip()
+            synthesis_prompt = f"{full_prompt}\nTool Output: {result}\nAssistant:"
+            s_data = ollama.generate(model=self.config["summary_model"], prompt=synthesis_prompt)
+            final_resp = s_data['response'].strip()
 
-            # self.ui.print_bot_message(final_resp)
-            # self.session_history.append({"role": "user", "content": user_input})
-            # self.session_history.append({"role": "assistant", "content": final_resp})
+            self.ui.print_bot_message(final_resp)
+            self.session_history.append({"role": "user", "content": user_input})
+            self.session_history.append({"role": "assistant", "content": final_resp})
 
         except Exception as e:
             # This catches our custom ValueErrors and any unexpected crashes
