@@ -17,7 +17,7 @@ from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
 pillow_heif.register_heif_opener()
 
 # --- CONFIGURATION ---
-MODEL_NAME = "llava"
+VISUAL_MODEL_NAME = "llava"
 SUPPORTED_EXTENSIONS = (".png", ".jpg", ".jpeg", ".webp", ".heic", ".heif")
 MAX_WORKERS = 4 
 
@@ -28,26 +28,22 @@ def get_user_inputs():
 
     source_folder = None
     output_name = "Sorted Photos"
-    target_subjects_input = "" # Initialize empty
+    target_subjects_input = ""
 
     try:
-        # 1. Get Folder
-        source_folder = filedialog.askdirectory(title="Select the folder containing images")
-        
+        source_folder = filedialog.askdirectory(title="Select the folder containing images you want to sort")
         if source_folder:
-            # 2. Get Output Folder Name
             name_input = simpledialog.askstring(
                 "Folder Name", 
-                "What should the main results folder be named?", 
+                "What should the master results folder be named?", 
                 initialvalue=output_name
             )
             if name_input:
                 output_name = name_input
             
-            # 3. NEW: Get Search Keywords via Popup
             keywords_input = simpledialog.askstring(
                 "Search Criteria", 
-                "What are you looking for? (e.g., 'people, pets, cars')",
+                "What are you looking for? (e.g., 'brown dog, blue car, person')",
                 initialvalue=""
             )
             if keywords_input:
@@ -57,9 +53,7 @@ def get_user_inputs():
         root.quit()
         root.destroy()
 
-    # Return three values now instead of two
     return source_folder, output_name, target_subjects_input
-
 
 def create_cancel_window():
     cancel_state = {"requested": False}
@@ -80,7 +74,6 @@ def create_cancel_window():
     root.protocol("WM_DELETE_WINDOW", request_cancel)
     return root, cancel_state
 
-
 def encode_image_to_base64(image_path):
     with Image.open(image_path) as img:
         rgb_img = img.convert("RGB")
@@ -96,7 +89,7 @@ def get_images_from_folder(folder_path):
         image_paths.extend(glob.glob(os.path.join(folder_path, f"*{ext.upper()}")))
     return image_paths
 
-def worker_task(img_path, prompt, target_subjects_list):
+def worker_task(img_path, prompt):
     filename = os.path.basename(img_path)
     try:
         llm = ChatOllama(model=MODEL_NAME)
@@ -112,7 +105,7 @@ def worker_task(img_path, prompt, target_subjects_list):
             "status": "SUCCESS",
             "filename": filename,
             "img_path": img_path,
-            "ai_response": ai_res_text,
+            "ai_description": ai_res_text,
             "error": None
         }
     except Exception as e:
@@ -120,32 +113,29 @@ def worker_task(img_path, prompt, target_subjects_list):
             "status": "ERROR",
             "filename": filename,
             "img_path": img_path,
-            "ai_response": str(e),
+            "ai_description": str(e),
             "error": str(e)
         }
 
 def main():
-    # UPDATED: Unpack three values from the input function
     knowledge_folder, saved_folder_name, raw_input_string = get_user_inputs()
     
     if not knowledge_folder:
         print("No folder selected. Exiting.")
         return
 
-    # Process the string from the popup into a list
-    target_subjects = [s.strip() for s in raw_input_string.lower().split(',') if s.strip()]
+    target_subjects = [s.strip().lower() for s in raw_input_string.split(',') if s.strip()]
     
     if not target_subjects:
         print("No subjects provided. Exiting.")
         return
 
-    # Create the base output folder
     base_saved_folder = os.path.join(os.getcwd(), saved_folder_name)
     if not os.path.exists(base_saved_folder):
         os.makedirs(base_saved_folder)
 
     print("\n==================================================")
-    print("PARALLEL MULTI-SUBJECT SEARCH AGENT")
+    print("IMPROVED DESCRIPTION-BASED SEARCH")
     print(f"Concurrency Level: {MAX_WORKERS} workers")
     print("==================================================")
     
@@ -154,30 +144,30 @@ def main():
         print(f"No images found.")
         return
 
-    print(f"\n[!] TARGETS: {', '.join(target_subjects).upper()}")
+    print(f"\n[!] SEARCHING FOR: {', '.join(target_subjects)}")
     print(f"[!] PROCESSING {len(image_files)} IMAGES...\n")
 
     stats = {"found": 0, "skipped": 0, "errors": 0}
     log_file_path = os.path.join(base_saved_folder, "detection_report.csv")
     
-    subjects_str = ", ".join(target_subjects)
     combined_prompt = (
-        f"Analyze this image. I am looking for these specific categories: [{subjects_str}]. "
-        f"For every category in the list above that you see in the image, write the category name exactly as it appears in my list. "
-        f"If you see something that belongs to a category (like a 'dog' belongs to 'pets'), write the category name: '{subjects_str}'. "
-        f"Respond with the category names separated by commas. If nothing matches, say 'none'."
+        "Provide a detailed description of this image. "
+        "Include colors, specific objects, and their characteristics (e.g., 'a brown dog', 'a blue car'). "
+        "Be descriptive, noting objects present. For example, if a dog is present, describe its color, size, and breed. If a person is present, make sure you describe that they are in the photo in your description."
     )
 
     with open(log_file_path, mode='w', newline='', encoding='utf-8') as csvfile:
         log_writer = csv.writer(csvfile)
-        log_writer.writerow(["Timestamp", "Filename", "Found_Subjects", "AI_Response"])
+        log_writer.writerow(["Timestamp", "Filename", "Found_Subjects", "AI_Description"])
 
         executor = ProcessPoolExecutor(max_workers=MAX_WORKERS)
         cancel_window, cancel_state = create_cancel_window()
         cancelled = False
         
         try:
-            futures = {executor.submit(worker_task, img, combined_prompt, target_subjects): img for img in image_files}
+            # Create the initial set of futures
+            futures = {executor.submit(worker_task, img, combined_prompt): img for img in image_files}
+            # pending keeps track of tasks that are not yet complete
             pending = set(futures)
             completed_count = 0
             
@@ -190,27 +180,25 @@ def main():
                         future.cancel()
                     break
 
-                done, pending = wait(pending, timeout=0.2, return_when=FIRST_COMPLETED)
+                # CRITICAL FIX: Pass 'pending' instead of 'futures.keys()'
+                # This ensures 'done' only contains tasks that just finished.
+                done, pending = wait(pending, timeout=0.5, return_when=FIRST_COMPLETED)
+                
                 for future in done:
                     completed_count += 1
                     result = future.result()
                     filename = result['filename']
                     img_path = result['img_path']
-                    ai_res = result['ai_response']
+                    ai_desc = result['ai_description']
 
                     print(f"[{completed_count}/{len(image_files)}] Finished: {filename}", end="\r")
 
                     if result['status'] == "SUCCESS":
                         matches = []
                         for subject in target_subjects:
-                            if subject in ai_res:
+                            if subject in ai_desc:
                                 matches.append(subject)
                         
-                        if not matches:
-                            for subject in target_subjects:
-                                if subject.lower() in ai_res:
-                                    matches.append(subject)
-
                         if matches:
                             stats["found"] += 1
                             unique_matches = list(set(matches))
@@ -218,12 +206,14 @@ def main():
                                 subject_folder = os.path.join(base_saved_folder, match)
                                 if not os.path.exists(subject_folder):
                                     os.makedirs(subject_folder)
-                                shutil.copy2(img_path, os.path.join(subject_folder, filename))
+                                
+                                # Fixed timestamp logic
+                                shutil.copy2(img_path, os.path.join(subject_folder, f"{filename}.jpg"))
                             
-                            log_writer.writerow([datetime.now(), filename, ", ".join(unique_matches), ai_res])
+                            log_writer.writerow([datetime.now(), filename, ", ".join(unique_matches), ai_desc])
                         else:
                             stats["skipped"] += 1
-                            log_writer.writerow([datetime.now(), filename, "NONE", ai_res])
+                            log_writer.writerow([datetime.now(), filename, "NONE", ai_desc])
                     else:
                         print(f"\n[!] Error on {filename}: {result['error']}")
                         log_writer.writerow([datetime.now(), filename, "ERROR", result['error']])
