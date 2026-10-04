@@ -1,4 +1,6 @@
 import subprocess
+import ollama
+import os
 from rich.console import Console
 import json # Added for cleaner output handling
 from abc import ABC, abstractmethod
@@ -39,3 +41,37 @@ class MemoryManagerTool(BaseTool):
             return self.manager.update_entry(category, key, content)
         
         return "Error: Memory update requires category, key, and content."
+
+class DnDExpertTool(BaseTool):
+    """A specialized sub-session tool for D&D Rules and Mechanics."""
+    
+    def execute(self, args: dict = None) -> str: # Changed signature from list to dict
+        # 1. Determine which model to use via the "model" key in the dictionary
+        # This is much safer than trying to index into a list with [0]
+        if isinstance(args, dict):
+            model_name = args.get("model", "gemma2:27b")
+        else:
+            model_name = "gemma2:27b" 
+
+        self.console.print(f"\nLaunching [bold gold1]D&D Expert Mode[/bold gold1]...")
+        
+        # 2. Find the path to the dnd_session script
+        # os.path.dirname(__file__) ensures we find the script in the same folder as this tool
+        script_path = os.path.join(os.path.dirname(__file__), "dnd_session.py")
+
+        try:
+            # 3. THE HANDOVER
+            # subprocess.run 'freezes' the BaxBot process and starts the new one.
+            # This allows the new process to have full control of the terminal.
+            # We pass the model_name as a command line argument to the script.
+            result = subprocess.run(["python3", script_path, model_name])
+            
+            # Check if the sub-process finished successfully
+            if result.returncode == 0:
+                return "User exited D&D Mode."
+            else:
+                return "D&D Session ended with an error (non-zero exit code)."
+                
+        except Exception as e:
+            self.console.print(f"[bold red]Failed to launch D&D Session: {e}[/bold red]")
+            return f"Error launching tool: {e}"

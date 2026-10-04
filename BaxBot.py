@@ -133,19 +133,48 @@ class BaxOrchestrator:
 
     def _handle_tool_call(self, full_prompt, response, user_input):
         try:
-            # Parsing logic
-            start_idx = response.find("[TOOL_CALL]") + len("[TOOL_CALL]")
-            end_idx = response.find("[/TOOL_CALL]")
-            tool_data = json.loads(response[start_idx:end_idx].strip())
+            # 1. DEFENSIVE TAG SEARCH
+            start_tag = "[TOOL_CALL]"
+            end_tag = "[/TOOL_CALL]"
             
-            name, args = tool_data["tool"], tool_data.get("args", {})
+            start_idx = response.find(start_tag)
+            end_idx = response.find(end_tag)
 
-            # Execute tool via the Tool Registry
+            if start_idx == -1 or end_idx == -1:
+                raise ValueError(f"Missing tool tags. Found Start: {start_idx}, End: {end_idx}")
+
+            # 2. EXTRACT STRING
+            # Move index to the end of the start tag
+            content_start = start_idx + len(start_tag)
+            json_str = response[content_start:end_idx].strip()
+
+            if not json_str:
+                raise ValueError("The tool call block is empty.")
+
+            # 3. SAFE JSON PARSING
+            try:
+                tool_data = json.loads(json_str)
+            except json.JSONDecodeError as e:
+                raise ValueError(f"Invalid JSON format: {e}")
+
+            # 4. STRUCTURE & KEY VALIDATION
+            # Check if it's a dictionary (LLMs sometimes accidentally return lists)
+            if not isinstance(tool_data, dict):
+                raise ValueError(f"Expected a JSON object (dict), but got {type(tool_data).__name__}")
+
+            # Use .get() to prevent KeyError: 0
+            name = tool_data.get("tool")
+            args = tool_data.get("args", {})
+
+            if not name:
+                raise ValueError(f"JSON missing the required 'tool' key. Found: {list(tool_data.keys())}")
+
+            # 5. EXECUTION
+            self.ui.print_status(f"Executing {name}...")
             result = self.tools.execute(name, args)
             self.ui.print_tool_output(name, result)
-            self.ui.print_status("Thinking...")
 
-            # Synthesis
+            # 6. SYNTHESIS
             synthesis_prompt = f"{full_prompt}\nTool Output: {result}\nAssistant:"
             s_data = ollama.generate(model=self.config["summary_model"], prompt=synthesis_prompt)
             final_resp = s_data['response'].strip()
@@ -155,7 +184,11 @@ class BaxOrchestrator:
             self.session_history.append({"role": "assistant", "content": final_resp})
 
         except Exception as e:
+            # This catches our custom ValueErrors and any unexpected crashes
             self.ui.print_error(f"Parsing failed: {e}")
+            self.ui.print_status("Check your prompt format.")
+            
+            # Fallback so the conversation doesn't die
             self.session_history.append({"role": "user", "content": user_input})
             self.session_history.append({"role": "assistant", "content": response})
 
@@ -168,7 +201,7 @@ class BaxOrchestrator:
 # --- 4. MAIN EXECUTION ---
 if __name__ == "__main__":
     from memory_manager import PersonalAgentMemory # Assume import exists
-    from tools_library import PhotoSorter, SystemStatsTool, MemoryManagerTool # Assume imports exist
+    from tools_library import PhotoSorter, SystemStatsTool, MemoryManagerTool, DnDExpertTool # Assume imports exist
 
     # 1. Load Configuration
     with open("agent_assets/config.json", 'r') as f:
@@ -184,6 +217,7 @@ if __name__ == "__main__":
         "photo_sorter": PhotoSorter(),
         "system_stats": SystemStatsTool(),
         "memory_manager": MemoryManagerTool(),
+        "dnd_expert": DnDExpertTool(),
     }
     tools = BaxTools(tools_map)
 
