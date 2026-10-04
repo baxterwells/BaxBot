@@ -25,7 +25,7 @@ class SystemStatsTool(BaseTool):
         self.console.print("\n[bold][󰣖 SystemStats][/bold]: Gathering system statistics...")
         cmd = "top -l 1 | head -n 10" 
         result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-        return result.stdout
+        return "\n" + result.stdout
 
 class MemoryManagerTool(BaseTool):
     def __init__(self):
@@ -52,8 +52,6 @@ class DnDExpertTool(BaseTool):
             model_name = args.get("model", "gemma2:27b")
         else:
             model_name = "gemma2:27b" 
-
-        self.console.print(f"\nLaunching [bold gold1]D&D Expert Mode[/bold gold1]...")
         
         # 2. Find the path to the dnd_session script
         # os.path.dirname(__file__) ensures we find the script in the same folder as this tool

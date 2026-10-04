@@ -170,7 +170,7 @@ class BaxOrchestrator:
                 raise ValueError(f"JSON missing the required 'tool' key. Found: {list(tool_data.keys())}")
 
             # 5. EXECUTION
-            self.ui.print_status(f"Executing {name}...")
+            self.ui.print_status(f"Running [bold magenta]{name}[/bold magenta] tool...")
             result = self.tools.execute(name, args)
             self.ui.print_tool_output(name, result)
 
@@ -229,7 +229,7 @@ if __name__ == "__main__":
             query = session.prompt("Ask BaxBot: ", multiline=True)
             if query.lower() in ['exit', 'quit', 'bye', 'see ya']:
                 if bot.session_history: bot._archive_memory()
-                ui.print_bot_message("Bye for now!\n")
+                ui.print_bot_message("Bye for now!\n\n")
                 break
             if not query.strip(): continue
             
