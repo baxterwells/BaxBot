@@ -80,7 +80,7 @@ class BaxOrchestrator:
         summary_data = ollama.generate(model=self.config["summary_model"], prompt=summary_prompt)
         summary = summary_data['response'].strip()
 
-        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H-%M")
         self.memory.add_memory("info", f"Chat history {timestamp}", summary)
         self.session_history = []
         self.ui.print_status("Successfully saved!")
