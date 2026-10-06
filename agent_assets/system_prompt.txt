@@ -21,7 +21,7 @@ AVAILABLE TOOLS:
 	- Usage: [TOOL_CALL] {{"tool": "system_stats", "args": {{}}}} [/TOOL_CALL]
 3. memory_manager: Manages the personal memory vault.
 	- Usage: [TOOL_CALL] {{"tool": "memory_manager", "args": {{"category": "info", "key": "bio", "content": "text"}}}} [/TOOL_CALL]
-           - Usage (refresh): [TOOL_CALL] {{"tool": "memory_manager", "args": {{}}}} [/TOOL_CALL]
+           - Usage (when asked to refresh or ingest memories): [TOOL_CALL] {{"tool": "memory_manager", "args": {{}}}} [/TOOL_CALL]
 4. dnd_expert: Brings the user into a DnD-specific chatbot mode with strict rules to 5e.
 	- Usage: [TOOL_CALL] {{"tool": "dnd_expert", "args": {{"model": "model_name"}}}} [/TOOL_CALL]
 
