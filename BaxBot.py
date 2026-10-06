@@ -45,8 +45,8 @@ class BaxTools:
 
 # --- 3. THE BRAIN (ORCHESTRATOR) ---
 class BaxOrchestrator:
-    """The central logic that coordinates Memory, UI, Tools, and LLM."""
-    def __init__(self, config: dict, memory, ui: BaxUI, tools: BaxTools):
+    """The central logic that coordinates Memory, UI, Tools, and LLM using ReAct architecture."""
+    def __init__(self, config: dict, memory, ui, tools):
         self.config = config
         self.memory = memory
         self.ui = ui
@@ -64,6 +64,7 @@ class BaxOrchestrator:
         info = "\n".join(info_raw) if isinstance(info_raw, list) else info_raw
         faith = "\n".join(faith_raw) if isinstance(faith_raw, list) else faith_raw
         tone = "\n".join(tone_raw) if isinstance(tone_raw, list) else tone_raw
+        
         return (
             self.prompt_template
             .replace("{{INFO}}", info)
@@ -72,130 +73,117 @@ class BaxOrchestrator:
             .replace("{{STM_CONTEXT}}", stm_context)
         )
 
+    def _parse_tool_call(self, response: str) -> dict:
+        """Extracts the tool name and arguments from the [TOOL_CALL] tags."""
+        start_tag = "[TOOL_CALL]"
+        end_tag = "[/TOOL_CALL]"
+        
+        start_idx = response.find(start_tag)
+        end_idx = response.find(end_tag)
+
+        if start_idx == -1 or end_idx == -1:
+            raise ValueError("Missing tool tags in response.")
+
+        content_start = start_idx + len(start_tag)
+        json_str = response[content_start:end_idx].strip()
+
+        if not json_str:
+            raise ValueError("The tool call block is empty.")
+
+        tool_data = json.loads(json_str)
+        
+        if not isinstance(tool_data, dict):
+            raise ValueError("Expected a JSON object for the tool call.")
+
+        name = tool_data.get("tool")
+        args = tool_data.get("args", {})
+
+        if not name:
+            raise ValueError("JSON missing the required 'tool' key.")
+
+        return {"name": name, "args": args}
+
+    def chat(self, user_input: str):
+        """The main ReAct Loop: Thought -> Action -> Observation."""
+        # 1. Record the user input in history
+        self.session_history.append({"role": "user", "content": user_input})
+
+        # Loop control variables
+        max_steps = 5  # Prev-ents infinite loops if the agent gets stuck
+        steps = 0
+        loop_complete = False
+
+        while steps < max_steps and not loop_complete:
+            # 2. Context Construction (Build history string for the current loop iteration)
+            # We include everything in the history so the agent sees its own previous thoughts/actions
+            stm_context = "\n--- Recent Conversation ---\n" + "\n".join(
+                [f"{m['role']}: {m['content']}" for m in self.session_history]
+            )
+
+            # 3. Retrieve Long-term Memory (Info/Faith/Tone)
+            retrieved_items = self.memory.query_all_memory(user_input)
+            info, faith, tone = [], [], []
+            for item in retrieved_items:
+                if item['category'] == "info": info.append(item['content'])
+                elif item['category'] == "faith": faith.append(item['content'])
+                elif item['category'] == "tone": tone.append(item['content'])
+
+            # 4. Assemble the current System Prompt
+            system_prompt = self._get_system_prompt(info, faith, tone, stm_context)
+            full_prompt = f"{system_prompt}\n\n{stm_context}\nAssistant:"
+
+            # 5. LLM Generation
+            self.ui.print_status(f"BaxBot is thinking (Step {steps+1}/{max_steps})...")
+            response_data = ollama.generate(model=self.config["main_model"], prompt=full_prompt)
+            response = response_data['response'].strip()
+
+            # 6. Decision Logic: Is this a Tool Call or a Final Answer?
+            if "[TOOL_CALL]" in response:
+                try:
+                    # Step A: Parse the tool call
+                    tool_info = self._parse_tool_call(response)
+                    name = tool_info["name"]
+                    args = tool_info["args"]
+
+                    # Step B: Execute the tool
+                    self.ui.print_status(f"Running [{name}]...")
+                    result = self.tools.execute(name, args)
+                    self.ui.print_tool_output(name, result)
+
+                    # Step C: Record the action and the observation back into history
+                    # We use 'system' role for the observation so the agent treats it as fact
+                    self.session_history.append({"role": "assistant", "content": response})
+                    self.session_history.append({"role": "system", "content": f"OBSERVATION: {result}"})
+                    
+                    steps += 1 # Continue the loop to let the agent process the observation
+                except Exception as e:
+                    self.ui.print_error(f"Tool Execution Error: {e}")
+                    self.session_history.append({"role": "assistant", "content": f"Error: {str(e)}"})
+                    break # Exit loop on error to prevent infinite loops
+            else:
+                # This is a final response (no [TOOL_CALL] found)
+                self.ui.print_bot_message(response)
+                self.session_history.append({"role": "assistant", "content": response})
+                loop_complete = True
+
+        # 7. Post-Chat: Check for archiving
+        if len(self.session_history) >= self.history_threshold:
+            self._archive_memory()
+
     def _archive_memory(self):
-        self.ui.print_status("Let me save this conversation to Long-Term Memory...")
+        """Saves summarized history to long-term memory."""
+        self.ui.print_status("Archiving conversation to memory...")
         history_text = "\n".join([f"{m['role']}: {m['content']}" for m in self.session_history])
         
-        summary_prompt = f"Summarize this:\n{history_text}" # Simplified for skeleton
+        summary_prompt = f"Summarize this conversation for long-term storage:\n{history_text}"
         summary_data = ollama.generate(model=self.config["summary_model"], prompt=summary_prompt)
         summary = summary_data['response'].strip()
 
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H-%M")
         self.memory.add_memory("info", f"Chat history {timestamp}", summary)
         self.session_history = []
-        self.ui.print_status("Successfully saved!")
+        self.ui.print_status("Archive complete.")
 
-    def chat(self, user_input: str):
-        # 1. SINGLE Unified Retrieval Phase
-        # We get a list of dicts: [{'content': '...', 'category': 'info'}, ...]
-        retrieved_items = self.memory.query_all_memory(user_input)
-
-        # 2. Local Categorization (Sorting the 'Enriched' items into their buckets)
-        info = []
-        faith = []
-        tone = []
-
-        for item in retrieved_items:
-            if item['category'] == "info":
-                info.append(item['content'])
-            elif item['category'] == "faith":
-                faith.append(item['content'])
-            elif item['category'] == "tone":
-                tone.append(item['content'])
-
-        # 3. Context Construction (The rest of your code remains exactly the same)
-        stm_context = ""
-        if self.session_history:
-            stm_context = "\n--- Recent Conversation ---\n" + "\n".join(
-                [f"{m['role']}: {m['content']}" for m in self.session_history]
-            )
-
-        # 4. Prompt Assembly (Pass the lists we just built)
-        system_prompt = self._get_system_prompt(info, faith, tone, stm_context)
-        full_prompt = f"{system_prompt}\n\nUser: {user_input}\nAssistant:"
-
-        self.ui.print_status("Thinking...")
-
-        
-        # 4. LLM Call
-        response_data = ollama.generate(model=self.config["main_model"], prompt=full_prompt)
-        response = response_data['response'].strip()
-
-        # 5. Action/Synthesis Logic
-        if "[TOOL_CALL]" in response:
-            self._handle_tool_call(full_prompt, response, user_input)
-        else:
-            self._handle_standard_chat(response, user_input)
-
-        # 6. Check for archiving
-        if len(self.session_history) >= self.history_threshold:
-            self._archive_memory()
-
-    def _handle_tool_call(self, full_prompt, response, user_input):
-        try:
-            # 1. DEFENSIVE TAG SEARCH
-            start_tag = "[TOOL_CALL]"
-            end_tag = "[/TOOL_CALL]"
-            
-            start_idx = response.find(start_tag)
-            end_idx = response.find(end_tag)
-
-            if start_idx == -1 or end_idx == -1:
-                raise ValueError(f"Missing tool tags. Found Start: {start_idx}, End: {end_idx}")
-
-            # 2. EXTRACT STRING
-            # Move index to the end of the start tag
-            content_start = start_idx + len(start_tag)
-            json_str = response[content_start:end_idx].strip()
-
-            if not json_str:
-                raise ValueError("The tool call block is empty.")
-
-            # 3. SAFE JSON PARSING
-            try:
-                tool_data = json.loads(json_str)
-            except json.JSONDecodeError as e:
-                raise ValueError(f"Invalid JSON format: {e}")
-
-            # 4. STRUCTURE & KEY VALIDATION
-            # Check if it's a dictionary (LLMs sometimes accidentally return lists)
-            if not isinstance(tool_data, dict):
-                raise ValueError(f"Expected a JSON object (dict), but got {type(tool_data).__name__}")
-
-            # Use .get() to prevent KeyError: 0
-            name = tool_data.get("tool")
-            args = tool_data.get("args", {})
-
-            if not name:
-                raise ValueError(f"JSON missing the required 'tool' key. Found: {list(tool_data.keys())}")
-
-            # 5. EXECUTION
-            self.ui.print_status(f"Running [bold magenta]{name}[/bold magenta] tool...")
-            result = self.tools.execute(name, args)
-            self.ui.print_tool_output(name, result)
-
-            # 6. SYNTHESIS
-            synthesis_prompt = f"{full_prompt}\nTool Output: {result}\nAssistant:"
-            s_data = ollama.generate(model=self.config["summary_model"], prompt=synthesis_prompt)
-            final_resp = s_data['response'].strip()
-
-            self.ui.print_bot_message(final_resp)
-            self.session_history.append({"role": "user", "content": user_input})
-            self.session_history.append({"role": "assistant", "content": final_resp})
-
-        except Exception as e:
-            # This catches our custom ValueErrors and any unexpected crashes
-            self.ui.print_error(f"Parsing failed: {e}")
-            self.ui.print_status("Check your prompt format.")
-            
-            # Fallback so the conversation doesn't die
-            self.session_history.append({"role": "user", "content": user_input})
-            self.session_history.append({"role": "assistant", "content": response})
-
-    def _handle_standard_chat(self, response, user_input):
-        self.ui.print_bot_message(response)
-        self.session_history.append({"role": "user", "content": user_input})
-        self.session_history.append({"role": "assistant", "content": response})
 
 
 # --- 4. MAIN EXECUTION ---
